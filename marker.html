@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#061224">
+<title>Solar System | Printed Marker AR</title>
+<style>
+  * { box-sizing: border-box; }
+  html,body { margin:0; width:100%; height:100%; overflow:hidden; background:#071225; color:#f3f9ff; font-family:system-ui,-apple-system,sans-serif; }
+  #hud { position:fixed; z-index:100000; top:0; left:0; right:0; pointer-events:none; }
+  #header { padding: max(14px,env(safe-area-inset-top)) 14px 12px; background:linear-gradient(180deg,rgba(3,12,27,.95),rgba(3,12,27,.1)); }
+  .eyebrow { color:#68e5f5; font-size:10px; letter-spacing:.18em; font-weight:800; }
+  h1 { font-size:20px; margin:5px 0; }
+  #status { background:rgba(3,19,39,.88); border:1px solid #477d98; padding:10px 12px; border-radius:12px; max-width:500px; font-size:13px; line-height:1.45; }
+  #status.found { border-color:#6df5be; color:#c5ffe6; }
+  #links { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; pointer-events:auto; }
+  #links a { background:#1ed5e5; color:#032431; padding:10px 12px; border-radius:10px; text-decoration:none; font-size:12px; font-weight:800; }
+  #links a.secondary { background:rgba(5,25,47,.88); color:#e9f8ff; border:1px solid #5384a4; }
+  #tools { position:fixed; bottom:max(22px,env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:100000; width:min(96vw,540px); display:flex; align-items:center; justify-content:center; gap:8px; background:rgba(4,19,40,.88); padding:10px; border:1px solid #457b99; border-radius:14px; }
+  #tools button { color:white; background:#133c57; border:1px solid #65c9e7; border-radius:9px; padding:12px 13px; font-size:13px; font-weight:750; white-space:nowrap; cursor:pointer; }
+  #size { font-size:12px; font-weight:800; min-width:52px; text-align:center; }
+  a-scene { position:fixed!important; inset:0!important; width:100vw!important; height:100vh!important; }
+  @media (max-width:370px) { #tools button { padding:11px 8px; font-size:11px; } h1 { font-size:17px; } }
+</style>
+<script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+<script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+</head>
+<body>
+<div id="hud">
+  <div id="header">
+    <div class="eyebrow">SCIENCE EXPO • RETURN-TO-SPOT MODE</div>
+    <h1>Solar System — Printed Marker AR</h1>
+    <div id="status">Allow camera access, then point at the printed HIRO marker. Keep the marker flat, visible and reasonably lit.</div>
+    <div id="links"><a href="print-marker.html" target="_blank" rel="noopener">PRINT THE MARKER</a><a class="secondary" href="index.html">3D PREVIEW / TABLE AR</a></div>
+  </div>
+</div>
+<div id="tools" aria-label="Marker AR controls">
+  <button id="smaller" type="button" aria-label="smaller">−</button>
+  <span id="size">MEDIUM</span>
+  <button id="bigger" type="button" aria-label="larger">+</button>
+  <button id="motion" type="button">▶ Start orbits</button>
+</div>
+<a-scene embedded vr-mode-ui="enabled: false" renderer="antialias: true; alpha: true" arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono;">
+  <a-marker id="hiro-marker" preset="hiro" emitevents="true" smooth="true" smooth-count="8" smooth-tolerance="0.02" smooth-threshold="3"></a-marker>
+  <a-entity camera></a-entity>
+</a-scene>
+<script>
+(function () {
+  const status = document.getElementById('status');
+  const marker = document.getElementById('hiro-marker');
+  const scene = document.querySelector('a-scene');
+  const sizeLabel = document.getElementById('size');
+  const motionButton = document.getElementById('motion');
+  const sizeSteps = [0.75, 1.0, 1.35, 1.7, 2.0];
+  const saved = Number(localStorage.getItem('solarExpoMarkerSize'));
+  let sizeIndex = Number.isInteger(saved) && saved >= 0 && saved < sizeSteps.length ? saved : 2;
+  let orbitsRunning = localStorage.getItem('solarExpoOrbits') === 'on';
+  let solarSystem = null;
+  let orbiters = [];
+  let sun = null;
+  let lastTime = 0;
+  function updateControls() {
+    sizeLabel.textContent = ['XS','SMALL','MEDIUM','LARGE','XL'][sizeIndex];
+    motionButton.textContent = orbitsRunning ? 'Ⅱ Pause orbits' : '▶ Start orbits';
+    if (solarSystem) solarSystem.scale.setScalar(sizeSteps[sizeIndex]);
+    document.getElementById('smaller').disabled = sizeIndex === 0;
+    document.getElementById('bigger').disabled = sizeIndex === sizeSteps.length - 1;
+  }
+  document.getElementById('smaller').addEventListener('click', () => { sizeIndex = Math.max(0,sizeIndex-1); localStorage.setItem('solarExpoMarkerSize', String(sizeIndex)); updateControls(); });
+  document.getElementById('bigger').addEventListener('click', () => { sizeIndex = Math.min(sizeSteps.length-1,sizeIndex+1); localStorage.setItem('solarExpoMarkerSize', String(sizeIndex)); updateControls(); });
+  motionButton.addEventListener('click', () => { orbitsRunning = !orbitsRunning; localStorage.setItem('solarExpoOrbits', orbitsRunning ? 'on' : 'off'); updateControls(); });
+  marker.addEventListener('markerFound', () => {
+    status.classList.add('found');
+    status.textContent = '✓ Marker found! The Solar System is aligned with this printed marker. Leave the paper in place; point at it again when you return.';
+  });
+  marker.addEventListener('markerLost', () => {
+    status.classList.remove('found');
+    status.textContent = 'Marker out of view. Point at the SAME printed marker to bring the Solar System back. This does not save a permanent world anchor.';
+  });
+  updateControls();
+  function initialize() {
+    if (solarSystem) return;
+    const THREE = AFRAME.THREE;
+    solarSystem = new THREE.Group();
+    marker.object3D.add(solarSystem);
+    const ambient = new THREE.AmbientLight(0xffffff, 1.5);
+    solarSystem.add(ambient);
+    const sunLight = new THREE.PointLight(0xffe6ad, 3, 4);
+    sunLight.position.set(0,.12,0);
+    solarSystem.add(sunLight);
+    const sphereGeometry = new THREE.SphereGeometry(1, 32, 24);
+    orbiters = [];
+
+    // All planet textures are generated in the browser: no images or assets required.
+    // To reuse Unity planet images later, replace the materials' maps with TextureLoader images.
+    function planetTexture(colors, seed, stripes = false, earth = false) {
+      const c = document.createElement('canvas');
+      c.width = 512; c.height = 256;
+      const ctx = c.getContext('2d');
+      let s = seed >>> 0;
+      const rnd = () => { s = (Math.imul(1664525, s) + 1013904223) >>> 0; return s / 4294967296; };
+      const hex = (h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+      const palette = colors.map(hex);
+      const img = ctx.createImageData(c.width, c.height);
+      for (let y = 0; y < c.height; y++) {
+        const lat = y / c.height;
+        for (let x = 0; x < c.width; x++) {
+          const i = (y * c.width + x) * 4;
+          const wave = Math.sin(y * (stripes ? .25 : .065) + Math.sin(x * .024) * (stripes ? 1.7 : 4.5));
+          const v = stripes ? Math.floor((wave + 1) / 2 * palette.length) : Math.floor(rnd() * palette.length);
+          const color = palette[Math.min(palette.length - 1, v)];
+          const shade = .84 + rnd() * .28;
+          img.data[i] = color[0] * shade;
+          img.data[i+1] = color[1] * shade;
+          img.data[i+2] = color[2] * shade;
+          img.data[i+3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      if (earth) {
+        ctx.fillStyle = '#4e9c6c';
+        for (let i = 0; i < 65; i++) {
+          const x = rnd() * 512, y = 25 + rnd() * 205;
+          const w = 6 + rnd() * 22, h = 4 + rnd() * 14;
+          ctx.beginPath(); ctx.ellipse(x, y, w, h, rnd() * Math.PI, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.fillStyle = 'rgba(245,250,255,.7)';
+        ctx.fillRect(0, 0, 512, 9); ctx.fillRect(0, 246, 512, 10);
+      }
+      const texture = new THREE.CanvasTexture(c);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return texture;
+    }
+
+    function ball(radius, colors, seed, options = {}) {
+      const mat = new THREE.MeshStandardMaterial({
+        map: planetTexture(colors, seed, !!options.stripes, !!options.earth),
+        roughness: 1,
+        metalness: 0,
+        emissive: options.glow ? new THREE.Color(0xff7b12) : new THREE.Color(0x000000),
+        emissiveIntensity: options.glow ? 1.5 : 0
+      });
+      const m = new THREE.Mesh(sphereGeometry, mat);
+      m.scale.setScalar(radius);
+      return m;
+    }
+
+    sun = ball(.094, ['#ffb222', '#ffdc53', '#ff7d12', '#fff2a0'], 1, { glow: true });
+    sun.position.y = .12;
+    solarSystem.add(sun);
+    const glow = new THREE.Mesh(new THREE.SphereGeometry(.115, 24, 16),
+      new THREE.MeshBasicMaterial({ color: 0xffa526, transparent: true, opacity: .09, depthWrite: false }));
+    glow.position.copy(sun.position);
+    solarSystem.add(glow);
+
+    const planets = [
+      { name: 'Mercury', r: .014, d: .16, speed: .19, colors: ['#74716c','#aba49a','#5d5b59'], seed: 2 },
+      { name: 'Venus', r: .024, d: .22, speed: .14, colors: ['#cfab69','#f2d49a','#9f784e'], seed: 3 },
+      { name: 'Earth', r: .026, d: .29, speed: .115, colors: ['#12509d','#1676c3','#073c75'], seed: 4, earth: true },
+      { name: 'Mars', r: .020, d: .36, speed: .092, colors: ['#b74f28','#da7847','#6f2c20'], seed: 5 },
+      { name: 'Jupiter', r: .063, d: .47, speed: .058, colors: ['#a76d50','#d9b48e','#e6d5b9','#8d5943'], seed: 6, stripes: true },
+      { name: 'Saturn', r: .052, d: .60, speed: .045, colors: ['#c7a16b','#ead6a5','#9f8055'], seed: 7, stripes: true },
+      { name: 'Uranus', r: .036, d: .72, speed: .032, colors: ['#71c8d2','#a2e2e5','#64aebf'], seed: 8 },
+      { name: 'Neptune', r: .034, d: .83, speed: .024, colors: ['#194fa6','#286cc8','#153e81'], seed: 9 }
+    ];
+
+    function orbitCircle(radius) {
+      const mesh = new THREE.Mesh(
+        new THREE.RingGeometry(radius - .0011, radius + .0011, 128),
+        new THREE.MeshBasicMaterial({ color: 0x83b3e9, side: THREE.DoubleSide, transparent: true, opacity: .27, depthWrite: false })
+      );
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.y = .12;
+      solarSystem.add(mesh);
+    }
+
+    for (let i = 0; i < planets.length; i++) {
+      const p = planets[i];
+      orbitCircle(p.d);
+      const pivot = new THREE.Group();
+      pivot.position.y = .12;
+      pivot.rotation.y = i * 1.75;
+      const mesh = ball(p.r, p.colors, p.seed, p);
+      mesh.position.x = p.d;
+      pivot.add(mesh);
+      solarSystem.add(pivot);
+      orbiters.push({ pivot, mesh, speed: p.speed });
+
+      if (p.name === 'Saturn') {
+        const ringSystem = new THREE.Group();
+        ringSystem.position.x = p.d;
+        pivot.add(ringSystem);
+        const ringColors = [0x92775e, 0xe0c9a4, 0x897361];
+        for (let j = 0; j < 3; j++) {
+          const ring = new THREE.Mesh(
+            new THREE.RingGeometry(.067 + j * .011, .076 + j * .011, 96),
+            new THREE.MeshBasicMaterial({ color: ringColors[j], side: THREE.DoubleSide, transparent: true, opacity: .78 })
+          );
+          ring.rotation.x = -.95;
+          ring.rotation.y = .35;
+          ringSystem.add(ring);
+        }
+      }
+      if (p.name === 'Earth') {
+        const moonPivot = new THREE.Group();
+        moonPivot.position.x = p.d;
+        pivot.add(moonPivot);
+        const moon = ball(.006, ['#bbbdbf','#777e84','#dadcde'], 11);
+        moon.position.set(.042, .012, 0);
+        moonPivot.add(moon);
+        orbiters.push({ pivot: moonPivot, mesh: moon, speed: .36 });
+      }
+    }
+
+
+    updateControls();
+    // Animation only moves planets relative to the marker. It never moves the marker itself.
+    function tick(t) {
+      const dt = lastTime ? Math.min((t-lastTime)/1000,.05) : 0;
+      lastTime = t;
+      if (orbitsRunning && marker.object3D.visible) {
+        for (const o of orbiters) { o.pivot.rotation.y += dt * o.speed; o.mesh.rotation.y += dt * .18; }
+        sun.rotation.y += dt * .05;
+      }
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+  if (scene.hasLoaded) initialize(); else scene.addEventListener('loaded', initialize, { once: true });
+})();
+</script>
+</body>
+</html>
