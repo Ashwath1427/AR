@@ -1,28 +1,23 @@
-SOLAR SYSTEM WEB AR — IPHONE SAFARI + ANDROID CHROME
+SOLAR SYSTEM — IPHONE SAFARI FROZEN POPUP FIX
 
-Files to upload to the ROOT of your GitHub Pages repository:
-  index.html
-  marker.html
-  print-marker.html
+UPDATE ONLY marker.html IN YOUR GITHUB REPOSITORY
 
-On iPhone:
-  1. Open the published HTTPS GitHub Pages URL in Safari, not inside WhatsApp/Instagram.
-  2. Select HIRO marker mode (or open marker.html directly).
-  3. Tap START CAMERA AR and allow camera access.
-  4. Point the rear camera at a printed HIRO marker (including the full black border).
-  5. Drag one finger to move relative to the marker; pinch/twist with two fingers.
-  6. Use the lock button to prevent accidental layout edits.
+1. Open https://github.com/Ashwath1427/AR
+2. Click marker.html, then Edit (pencil).
+3. Replace its entire contents with the marker.html from this folder.
+4. Commit changes. Wait for GitHub Pages to update.
+5. On iPhone, open your GitHub Pages URL directly in Safari, refresh, and tap Start Camera AR.
+6. If Safari asks for CAMERA permission, tap Allow. No motion sensor popup is needed.
+7. Point at the complete printed HIRO marker, then use touch controls.
 
-On Android:
-  Use the same marker mode in Chrome; Android WebXR table mode remains in index.html.
+CHANGES
+- Disables A-Frame motion sensor permission UI (caused the white Deny / Allow popup).
+- Disables A-Frame camera look-controls (not needed for HIRO marker AR).
+- Keeps AR.js camera video in front of dark page and behind transparent 3D canvas.
+- Prevents a double camera-open request that can freeze iPhone Safari.
+- Prevents the gesture layer from blocking permission dialogs before HIRO is detected.
+- Preserves all planets, saved layout, pinch/drag/rotate, and orbit animations.
 
-This is marker-relative AR, NOT persistent world anchoring. For reliable placement,
-keep the marker in view and taped to the same place. Camera tracking requires
-visible contrast and at least some ambient light. The saved position, scale and
-rotation are relative to the marker, stored on that same browser.
-
-If Safari has a black camera view, use Resume Camera or Restart. Check Safari
-website Camera permissions and that no other app is using the camera.
-
-A-Frame 1.6.0 + AR.js 3.4.7 pinned for compatible marker tracking.
-Browser AR still requires testing on real phones.
+LIMITATION: Marker tracking still requires a visible marker and enough camera light.
+This is not a persistent world anchor; saved adjustments are relative to HIRO.
+This package is syntax-checked, not tested on a physical iPhone.

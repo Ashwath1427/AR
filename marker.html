@@ -12,6 +12,15 @@
 html,body {margin:0;width:100%;height:100%;overflow:hidden;background:#051225;color:#f4faff;font-family:system-ui,-apple-system,sans-serif}
 button,a {font:inherit}
 #scene-mount, a-scene {position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important}
+/* AR.js creates a separate camera video. Keep it in FRONT of the body background,
+   but BEHIND the transparent A-Frame canvas and the clickable interface. */
+#scene-mount {z-index:2!important;background:transparent!important;pointer-events:none!important}
+#scene-mount a-scene, #scene-mount canvas {background:transparent!important;pointer-events:none!important}
+#arjs-video {position:fixed!important;z-index:1!important;pointer-events:none!important;visibility:visible!important;opacity:1!important}
+/* Backup for older A-Frame releases: the marker does not need a motion sensor
+   permission popup, and the popup can trap all taps on iPhone. */
+.a-dialog, .a-dialog-container, .a-dialog-text,
+.a-dialog-allow-button, .a-dialog-deny-button, .a-orientation-modal {display:none!important}
 #hud {position:fixed;z-index:100002;top:0;left:0;right:0;pointer-events:none}
 #header {padding:max(12px,env(safe-area-inset-top)) 12px 10px;background:linear-gradient(180deg,rgba(2,10,25,.96),rgba(2,10,25,.55) 75%,transparent)}
 .eyebrow {color:#67e6f3;letter-spacing:.15em;font-size:10px;font-weight:850}
@@ -23,9 +32,9 @@ h1 {font-size:18px;line-height:1.2;margin:4px 0 7px}
 #links a, #links button {border:1px solid #4d8ea8;border-radius:9px;padding:7px 10px;background:rgba(7,37,59,.94);color:#d5faff;text-decoration:none;font-size:11px;font-weight:750;cursor:pointer}
 #links a:first-child {background:#1ed7e4;color:#002531;border-color:transparent}
 #gesture-surface {position:fixed;z-index:100000;left:0;right:0;top:138px;bottom:151px;touch-action:none;display:none}
-body.started #gesture-surface {display:block}
+body.started.has-marker #gesture-surface {display:block;pointer-events:auto}
 #gesture-tip {position:fixed;z-index:100001;bottom:calc(140px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);font-size:11px;text-align:center;color:#d5f6ff;background:rgba(4,19,37,.8);padding:6px 10px;border-radius:999px;white-space:nowrap;pointer-events:none;display:none}
-body.started #gesture-tip {display:block}
+body.started.has-marker #gesture-tip {display:block}
 #tools {position:fixed;z-index:100003;left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));display:none;flex-direction:column;gap:7px;padding:9px;border:1px solid #39738f;border-radius:14px;background:rgba(2,16,34,.94)}
 body.started #tools {display:flex}
 .tool-row {display:flex;justify-content:center;align-items:center;gap:6px;flex-wrap:nowrap}
@@ -68,7 +77,7 @@ body.started #tools {display:flex}
   <h2>Place Your Solar System</h2>
   <p>Use Safari on iPhone or Chrome on Android. Point at a printed HIRO marker: the Solar System appears automatically. Drag to move, pinch to resize, twist to rotate, then lock your adjustments.</p>
   <button id="start-camera" type="button">START CAMERA AR</button><div id="start-error" role="alert"></div>
-  <p>On iPhone, open directly in <strong>Safari</strong> (not an in-app browser), tap Allow Camera, and keep the entire marker in view. Works on HTTPS.</p>
+  <p>On iPhone, open directly in <strong>Safari</strong>, allow <strong>Camera</strong> access, and keep the entire HIRO marker in view. Motion sensor permission is not needed. Works on HTTPS.</p>
   <p><a href="print-marker.html">Print the marker</a> · <a href="index.html">3D preview</a></p>
 </div></div>
 <script>
@@ -211,7 +220,7 @@ body.started #tools {display:flex}
   function showResume(show) { $('resume-camera').classList.toggle('visible', !!show); }
   function resumeCamera() {
     enableInlineVideo();
-    const video=document.querySelector('video');
+    const video=document.getElementById('arjs-video') || document.querySelector('video');
     if (!video) {
       setStatus('No camera video found. Tap Restart and allow camera access.','wait');
       return;
@@ -229,10 +238,13 @@ body.started #tools {display:flex}
   }
   window.addEventListener('arjs-video-loaded',()=>{
     cameraReady=true;enableInlineVideo();
-    if(!everFound) setStatus('Camera ready. Point at the FULL printed HIRO marker.','wait');
-    // On some iOS versions playback is suspended; a user gesture can resume it.
-    const video=document.querySelector('video');
-    if(video && video.paused) showResume(true);
+    const video=document.getElementById('arjs-video') || document.querySelector('video');
+    if(video && video.paused) {
+      showResume(true);
+      setStatus('Camera paused. Tap Resume Camera to continue, then scan HIRO.','wait');
+    } else if(!everFound) {
+      setStatus('Camera ready. Point at the FULL printed HIRO marker.','wait');
+    }
   });
   window.addEventListener('camera-init',()=>{
     cameraReady=true;
@@ -250,57 +262,40 @@ body.started #tools {display:flex}
       if(video && video.paused) showResume(true);
     }
   });
-  async function startCameraAR() {
+  function startCameraAR() {
     if(startingCamera) return;
     if(!window.isSecureContext) {
       $('start-error').textContent='Use your HTTPS GitHub Pages link, not a local file.';return;
     }
     if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      $('start-error').textContent='Camera unavailable. Open this HTTPS website in Safari on iPhone or Chrome on Android.';return;
+      $('start-error').textContent='Camera unavailable. Open this HTTPS website directly in Safari on iPhone or Chrome on Android.';return;
     }
     if(!window.AFRAME || !AFRAME.THREE) {
       $('start-error').textContent='AR libraries did not load. Check internet access and reload.';return;
     }
-    startButton.disabled=true;
-    startButton.textContent='ALLOW CAMERA ACCESS…';
-    $('start-error').textContent='If prompted, choose Allow Camera.';
-    // Request camera permission in the actual tap gesture. Close this short-lived
-    // stream before AR.js requests the camera, avoiding competing iPhone streams.
-    let testStream;
-    try {
-      testStream=await navigator.mediaDevices.getUserMedia({
-        audio:false,
-        video:{facingMode:{ideal:'environment'},width:{ideal:640},height:{ideal:480}}
-      });
-    } catch (err) {
-      const denied=err && (err.name==='NotAllowedError'||err.name==='PermissionDeniedError');
-      $('start-error').textContent=denied
-        ? 'Camera permission denied. In iPhone Safari: aA / page settings → Camera → Allow, then try again.'
-        : 'Cannot open camera: '+(err?.message||err?.name||'unknown error')+'. Close other camera apps and try again.';
-      startButton.disabled=false;
-      startButton.textContent='TRY CAMERA AGAIN';
-      return;
-    } finally {
-      if(testStream) testStream.getTracks().forEach(track=>track.stop());
-    }
+    // AR.js requests the camera itself. Do not open and close a second stream first:
+    // Safari can leave the camera black when two requests happen back-to-back.
     startingCamera=true;
-    startButton.textContent='STARTING AR…';
+    startButton.disabled=true;
+    startButton.textContent='STARTING CAMERA…';
     overlay.classList.add('hidden');
     document.body.classList.add('started');
-    setStatus('Camera permission granted. Starting HIRO detection…','wait');
+    setStatus('Starting iPhone / Android camera. Allow CAMERA access if Safari asks…','wait');
     const mount=$('scene-mount');
-    mount.innerHTML=`<a-scene embedded vr-mode-ui="enabled: false" renderer="antialias: false; alpha: true; precision: mediump" arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono; sourceWidth: 640; sourceHeight: 480; displayWidth: 640; displayHeight: 480;">
+    mount.innerHTML=`<a-scene embedded vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false" background="transparent: true" renderer="antialias: false; alpha: true; precision: mediump" arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono; sourceWidth: 640; sourceHeight: 480; displayWidth: 640; displayHeight: 480;">
       <a-marker id="hiro-marker" preset="hiro" emitevents="true" smooth="true" smooth-count="8" smooth-tolerance="0.01" smooth-threshold="3"></a-marker>
       <a-entity id="stable-anchor" visible="false"></a-entity>
-      <a-entity camera></a-entity>
+      <a-entity camera look-controls="enabled: false" wasd-controls="enabled: false"></a-entity>
     </a-scene>`;
     scene=mount.querySelector('a-scene');marker=$('hiro-marker');anchor=$('stable-anchor');
     marker.addEventListener('markerFound',()=>{
       markerVisible=true;everFound=true;
+      document.body.classList.add('has-marker');
       setStatus('✓ HIRO detected! Drag to move, pinch to resize, twist to rotate. Keep the marker visible for accurate alignment.','found');
     });
     marker.addEventListener('markerLost',()=>{
       markerVisible=false;
+      document.body.classList.remove('has-marker');
       setStatus('Tracking briefly lost. Keep the full HIRO marker visible…','wait');
     });
     if(scene.hasLoaded) initialize();else scene.addEventListener('loaded',initialize,{once:true});
