@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#03091a">
-  <title>Solar System AR | Exhibition Edition</title>
+  <title>Solar System AR | iPhone + Android Exhibition Edition</title>
   <style>
     * { box-sizing: border-box; }
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #03091a; color: #f2f8ff; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
@@ -49,10 +49,10 @@
   <div id="hero">
     <div class="eyebrow">SCIENCE WEEK • INTERACTIVE EXHIBIT</div>
     <h1>Explore Our Solar System</h1>
-    <p>Eight planets, Saturn's rings and Earth's Moon. Explore in 3D—or place the Solar System on a real table using your Android phone. Adjustable size, tabletop placement, and a printed-marker mode for easier return visits.</p><a id="mode-link" href="marker.html">★ PRINTED-MARKER AR — RECOMMENDED FOR EXPO</a>
+    <p>Eight planets, Saturn's rings and Earth's Moon. Explore in 3D, place on a table with Android WebXR, or use printed-marker camera AR on iPhone Safari and Android Chrome.</p><a id="mode-link" href="marker.html">★ IPHONE + ANDROID CAMERA AR (HIRO MARKER)</a>
   </div>
   <div id="guide">Drag to explore the 3D preview. On a compatible Android phone, tap <strong>START AR</strong> below.<span id="support">Checking AR support…</span></div>
-  <div id="ar-start-note">Table AR requires a supported Android phone. Printed-marker AR also supports compatible iPhone browsers; both need camera visibility.</div>
+  <div id="ar-start-note">iPhone: choose HIRO Marker AR above. Android: use WebXR Table AR or HIRO Marker AR. Camera modes require HTTPS and visible surroundings.</div>
   <div id="footer">SUN · MERCURY · VENUS · EARTH · MARS · JUPITER · SATURN · URANUS · NEPTUNE</div>
   <button id="reset" type="button">↻ Place Again</button>
   <button id="place-now" class="ar-action" type="button">✓ PLACE ON TABLE</button>
@@ -415,7 +415,12 @@
     document.body.appendChild(arButton);
     arButton.style.zIndex = '12';
 
-    if (navigator.xr) {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (isIOS) {
+      arButton.style.display = 'none';
+      support.textContent = 'iPhone detected: tap IPHONE + ANDROID CAMERA AR above to use the printed HIRO marker.';
+    } else if (navigator.xr) {
       navigator.xr.isSessionSupported('immersive-ar').then(ok => {
         support.textContent = ok ? 'AR available: tap START AR to begin.' : 'AR unavailable here. You can still explore the 3D preview.';
       }).catch(() => { support.textContent = 'AR support could not be checked. Preview is still available.'; });

@@ -1,31 +1,28 @@
-SOLAR SYSTEM AR — SCIENCE EXPO EDITION
-======================================
-This ZIP includes:
-- index.html: 3D preview and Android WebXR tabletop AR (retains existing features)
-- marker.html: alternate AR.js printed-Hiro-marker tracking (Android and compatible iPhone browsers)
-- print-marker.html: printable official Hiro marker from AR.js project
+SOLAR SYSTEM WEB AR — IPHONE SAFARI + ANDROID CHROME
 
-HOW TO HOST
-Upload ALL THREE .html files to the ROOT of your public GitHub Pages repository.
-Do not upload the ZIP as one file. The website must use HTTPS.
-Your home page will be https://USERNAME.github.io/REPOSITORY/
-Your marker page will be https://USERNAME.github.io/REPOSITORY/marker.html
-Your print page will be https://USERNAME.github.io/REPOSITORY/print-marker.html
+Files to upload to the ROOT of your GitHub Pages repository:
+  index.html
+  marker.html
+  print-marker.html
 
-EXHIBITION SETUP
-1. Open print-marker.html on a computer with internet access and print the marker.
-2. Tape the marker flat to a fixed position on a matte table.
-3. On Android Chrome or compatible iPhone Safari, open marker.html, grant camera permission.
-4. Point at the marker. Sun and eight planets appear above it, with Earth's Moon and Saturn's rings.
-5. Return later, open the same link and point at the SAME marker. The model is aligned to the marker again.
-6. Use + / - for size, and Start orbits to animate. Settings are remembered on the same browser.
-7. If marker tracking is poor, add a small desk/USB light and keep the marker clean and flat.
-8. index.html still supports the previous Android tabletop AR and a non-AR 3D preview.
+On iPhone:
+  1. Open the published HTTPS GitHub Pages URL in Safari, not inside WhatsApp/Instagram.
+  2. Select HIRO marker mode (or open marker.html directly).
+  3. Tap START CAMERA AR and allow camera access.
+  4. Point the rear camera at a printed HIRO marker (including the full black border).
+  5. Drag one finger to move relative to the marker; pinch/twist with two fingers.
+  6. Use the lock button to prevent accidental layout edits.
 
-IMPORTANT HONEST LIMITATIONS
-- Marker AR does NOT persist an invisible world anchor across sessions. The physical paper marker is the location reference; it must be visible for tracking. If removed/moved, the model follows its new position.
-- No camera AR can be guaranteed in darkness or on every device. Marker tracking needs enough light and camera focus to recognize the black/white image.
-- WebXR hit-test anchors in the other mode are session-scoped, not permanent location memory.
-- 'INSTANT FLOATING DEMO' does not attach to the physical table.
-- This is a browser-based proof of concept. HTML and JavaScript syntax were checked; real-device AR needs testing before the exhibition.
-- Three.js, A-Frame, AR.js and the official marker image are fetched from public CDN/GitHub URLs; internet is required unless self-hosted.
+On Android:
+  Use the same marker mode in Chrome; Android WebXR table mode remains in index.html.
+
+This is marker-relative AR, NOT persistent world anchoring. For reliable placement,
+keep the marker in view and taped to the same place. Camera tracking requires
+visible contrast and at least some ambient light. The saved position, scale and
+rotation are relative to the marker, stored on that same browser.
+
+If Safari has a black camera view, use Resume Camera or Restart. Check Safari
+website Camera permissions and that no other app is using the camera.
+
+A-Frame 1.6.0 + AR.js 3.4.7 pinned for compatible marker tracking.
+Browser AR still requires testing on real phones.
