@@ -55,8 +55,8 @@ body.started #tools {display:flex}
 #start-card a {color:#82e6ff}
 @media(max-width:385px){h1{font-size:16px}#tools button{font-size:11px;padding:7px 7px}#size{min-width:47px}#gesture-surface{top:154px}#gesture-tip{font-size:10px}}
 </style>
-<script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-<script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
+<script src="aframe.min.js"></script>
+<script src="aframe-ar.js"></script>
 <link rel="stylesheet" href="planets.css">
 <style>body:not(.started) #planet-ui{display:none} body.started #planet-ui{top:155px;bottom:auto} @media(max-width:700px){body.started #planet-ui{top:auto;bottom:calc(130px + env(safe-area-inset-bottom))} body.started #planet-ui .planet-card{max-height:29vh}} #manual-camera{width:100%;border:1px solid #65d5e8;border-radius:12px;padding:15px;background:#123b58;color:white;font-weight:800;margin-top:9px;cursor:pointer}</style>
 <style>
@@ -111,7 +111,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #b7e9ff;outline-offset:2p
   let solarSystem = null, layoutRoot = null, orbiters = [], sun = null;
   let lastTime = 0, markerVisible = false, everFound = false, trackingStarted = false;
   let lastSeenAt = -Infinity, lastTrackingMessage = '';
-  let cameraReady = false, startingCamera = false;
+  let cameraReady = false, startingCamera = false, cameraFailed = false;
   let orbitsRunning = false, adjustmentsLocked = false;
   let mode="hiro", manualPlaced=false, manualAwaiting=false, touchStart=null, touchMoved=false;
   const selectable=[]; const panel=makePlanetPanel();
@@ -226,6 +226,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #b7e9ff;outline-offset:2p
     if(!e.touches.length && touchStart && !touchMoved){if(manualAwaiting) placeManual(touchStart.x,touchStart.y); else selectAt(touchStart.x,touchStart.y);} if(gesture){persist();gesture=touchInfo(e.touches);} if(!e.touches.length)touchStart=null;
   },{passive:false});
   gestureSurface.addEventListener('touchcancel',()=>{gesture=null;persist();},{passive:false});
+  gestureSurface.addEventListener('click',e=>{if(e.detail===0)return;if(manualAwaiting)placeManual(e.clientX,e.clientY);else if(everFound)selectAt(e.clientX,e.clientY)});
 
   function enableInlineVideo() {
     document.querySelectorAll('video').forEach(video=>{
@@ -274,9 +275,9 @@ button:focus-visible,a:focus-visible{outline:3px solid #b7e9ff;outline-offset:2p
     if(!everFound && mode==='hiro') setStatus('Camera active. Searching for HIRO marker…','wait');
   });
   window.addEventListener('camera-error',e=>{
-    showResume(true);
+    cameraFailed=true;showResume(true);
     const message=e?.detail?.error?.message || e?.detail?.error?.name || 'camera unavailable';
-    setStatus('Camera error: '+message+'. In iPhone Safari, allow Camera for this website, then Restart.','wait');
+    setStatus('Camera error: '+message+'. Allow camera access in browser settings, then tap Restart.','wait');
   });
   document.addEventListener('visibilitychange',()=>{
     if(!document.hidden && startingCamera) {
@@ -285,8 +286,25 @@ button:focus-visible,a:focus-visible{outline:3px solid #b7e9ff;outline-offset:2p
       if(video && video.paused) showResume(true);
     }
   });
-  function placeManual(x,y){ if(!anchor) return; anchor.object3D.position.set((x/innerWidth-.5)*3.5,(.5-y/innerHeight)*2.5,-3); anchor.object3D.rotation.set(-.85,0,0); anchor.object3D.visible=true; manualPlaced=true;manualAwaiting=false;everFound=true; document.body.classList.add('has-marker');setStatus('Screen overlay placed · Tap a planet to explore.','found'); }
-  function selectAt(x,y){if(!scene || !scene.camera || !anchor.object3D.visible)return;const T=AFRAME.THREE;const ray=new T.Raycaster();ray.setFromCamera(new T.Vector2(x/innerWidth*2-1,-y/innerHeight*2+1),scene.camera);const hit=ray.intersectObjects(selectable,false)[0];if(hit)panel.show(hit.object.userData.name);}
+  function placeManual(x,y){
+    if(!anchor||!scene||!scene.camera||!scene.canvas)return;
+    syncCanvasToSource();const rect=scene.canvas.getBoundingClientRect(),p=scene.camera.projectionMatrix.elements,depth=3;
+    const nx=(x-rect.left)/rect.width*2-1,ny=1-(y-rect.top)/rect.height*2;
+    anchor.object3D.position.set(nx*depth/p[0],ny*depth/p[5],-depth);anchor.object3D.rotation.set(-.85,0,0);
+    anchor.object3D.visible=true;manualPlaced=true;manualAwaiting=false;everFound=true;document.body.classList.add('has-marker');setStatus('Screen overlay placed · Tap a planet to explore.','found');
+  }
+  // AR.js crops the camera to fill the screen. Give A-Frame's canvas the
+  // same displayed rectangle, so the model is not stretched on portrait phones.
+  let lastCanvasRect='';
+  function syncCanvasToSource(){
+    const source=document.getElementById('arjs-video');const canvas=scene && scene.canvas;
+    if(!source||!canvas)return;
+    const rect=source.getBoundingClientRect();if(!rect.width||!rect.height)return;
+    const key=[rect.left,rect.top,rect.width,rect.height].map(n=>Math.round(n*10)/10).join(',');
+    if(key===lastCanvasRect)return;lastCanvasRect=key;
+    for(const [prop,value] of Object.entries({position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',height:rect.height+'px',margin:'0'}))canvas.style.setProperty(prop,value,'important');
+  }
+  function selectAt(x,y){if(!scene || !scene.camera || !anchor.object3D.visible)return;const T=AFRAME.THREE;const rect=scene.canvas.getBoundingClientRect();const ray=new T.Raycaster();ray.setFromCamera(new T.Vector2((x-rect.left)/rect.width*2-1,-(y-rect.top)/rect.height*2+1),scene.camera);const hit=ray.intersectObjects(selectable,false)[0];if(hit)panel.show(hit.object.userData.name);}
   function startCameraAR(chosenMode='hiro') {
     mode=chosenMode;
     if(startingCamera) return;
@@ -301,15 +319,15 @@ button:focus-visible,a:focus-visible{outline:3px solid #b7e9ff;outline-offset:2p
     }
     // AR.js requests the camera itself. Do not open and close a second stream first:
     // Safari can leave the camera black when two requests happen back-to-back.
-    startingCamera=true;
+    startingCamera=true;cameraFailed=false;
     startButton.disabled=true;
     startButton.textContent='STARTING CAMERA…';
     overlay.classList.add('hidden');
     document.body.classList.add('started');
     setStatus('Starting iPhone / Android camera. Allow CAMERA access if Safari asks…','wait');
     const mount=$('scene-mount');
-    mount.innerHTML=`<a-scene embedded vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false" background="transparent: true" renderer="antialias: false; alpha: true; precision: mediump" arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono; sourceWidth: 640; sourceHeight: 480; displayWidth: 640; displayHeight: 480;">
-      <a-marker id="hiro-marker" preset="hiro" emitevents="true" smooth="true" smooth-count="8" smooth-tolerance="0.01" smooth-threshold="3"></a-marker>
+    mount.innerHTML=`<a-scene embedded vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false" background="transparent: true" renderer="antialias: false; alpha: true" arjs="sourceType: webcam; cameraParametersUrl: camera_para.dat; debugUIEnabled: false; detectionMode: mono; sourceWidth: 640; sourceHeight: 480; displayWidth: 640; displayHeight: 480;">
+      <a-marker id="hiro-marker" preset="custom" type="pattern" url="hiro.patt" emitevents="true" smooth="true" smooth-count="8" smooth-tolerance="0.01" smooth-threshold="3"></a-marker>
       <a-entity id="stable-anchor" visible="false"></a-entity>
       <a-entity camera look-controls="enabled: false" wasd-controls="enabled: false"></a-entity>
     </a-scene>`;
@@ -326,14 +344,16 @@ button:focus-visible,a:focus-visible{outline:3px solid #b7e9ff;outline-offset:2p
       document.body.classList.remove('has-marker');
       setStatus('Tracking briefly lost. Keep the full HIRO marker visible…','wait');
     });
-    if(scene.hasLoaded) initialize();else scene.addEventListener('loaded',initialize,{once:true});
+    function safeInitialize(){try{initialize()}catch(error){console.error(error);setStatus('AR could not start. Reload this page and check the site files.','wait');}}
+    if(scene.hasLoaded) safeInitialize();else scene.addEventListener('loaded',safeInitialize,{once:true});
     setTimeout(()=>{
+      if(cameraFailed) return;
       const video=document.querySelector('video');
       if(!video || video.readyState<2) {
         showResume(true);
         setStatus('Camera not displaying. Tap Resume Camera or Restart. On iPhone check Safari camera permission.','wait');
       } else if(!everFound && mode==='hiro') {
-        setStatus('Camera is running. Hold the full black-bordered HIRO marker steady in view.','wait');
+        setStatus('Camera is running. Keep the complete HIRO marker flat, well lit and in view.','wait');
       }
     },12000);
   }
@@ -442,6 +462,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #b7e9ff;outline-offset:2p
     function tick(t) {
       const dt=lastTime?Math.min((t-lastTime)/1000,.05):0;
       lastTime=t;
+      syncCanvasToSource();
       // Tracking controls the anchor; planet orbiting NEVER changes its pose.
       if(mode==='manual'){ anchor.object3D.visible=manualPlaced; } else if(markerVisible && marker.object3D.visible) {
         marker.object3D.updateMatrixWorld(true);
