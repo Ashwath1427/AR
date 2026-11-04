@@ -76,6 +76,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #b7e9ff;outline-offset:2p
 </style>
 <script src="planets.js"></script>
 <script src="textures.js"></script>
+<script src="space-effects.js"></script>
 </head>
 <body>
 <div id="scene-mount"></div>
@@ -348,6 +349,8 @@ button:focus-visible,a:focus-visible{outline:3px solid #b7e9ff;outline-offset:2p
     layoutRoot.add(solarSystem);
     const ambient=new THREE.AmbientLight(0xffffff,1.5);solarSystem.add(ambient);
     const sunLight=new THREE.PointLight(0xffe6ad,3,4);sunLight.position.set(0,.12,0);solarSystem.add(sunLight);
+    const belt=SpaceEffects.asteroidBelt(THREE,{inner:.385,outer:.425,count:320,rockSize:.0032,height:.12});solarSystem.add(belt);
+    const stars=SpaceEffects.starField(THREE,{count:110,radius:1.0,spread:.55,size:2,opacity:.72});stars.position.y=.12;solarSystem.add(stars);
     const sphereGeometry = new THREE.SphereGeometry(1, 24, 16);
     orbiters = [];
 
@@ -464,6 +467,7 @@ button:focus-visible,a:focus-visible{outline:3px solid #b7e9ff;outline-offset:2p
         }
       }
       if(orbitsRunning && anchor.object3D.visible) {
+        belt.rotation.y+=dt*.015;
         for(const o of orbiters){o.pivot.rotation.y+=dt*o.speed;o.mesh.rotation.y+=dt*.18;}
         if(sun) sun.rotation.y+=dt*.05;
       }

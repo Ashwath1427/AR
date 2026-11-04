@@ -64,6 +64,7 @@
     <button id="motion" type="button">▶ Start orbits</button>
   </div>
 
+  <script src="space-effects.js"></script>
   <script type="module">
     import * as THREE from 'three';
     import { ARButton } from 'three/addons/webxr/ARButton.js';
@@ -100,6 +101,8 @@
     scene.add(placementRoot);
     const solarSystem = new THREE.Group();
     placementRoot.add(solarSystem);
+    const belt=SpaceEffects.asteroidBelt(THREE,{inner:.385,outer:.425,count:320,rockSize:.0032,height:.12});solarSystem.add(belt);
+    const modelStars=SpaceEffects.starField(THREE,{count:110,radius:1.0,spread:.55,size:2,opacity:.72});modelStars.position.y=.12;solarSystem.add(modelStars);
     const sphereGeometry = new THREE.SphereGeometry(1, 32, 24);
     const orbiters = [];
 
@@ -501,6 +504,7 @@
     renderer.setAnimationLoop((_, frame) => {
       const dt = Math.min(clock.getDelta(), .05);
       if (orbitsRunning) {
+        belt.rotation.y+=dt*.015;
         for (const o of orbiters) {
           o.pivot.rotation.y += dt * o.speed;
           o.mesh.rotation.y += dt * .18;
