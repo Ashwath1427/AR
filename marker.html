@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, ">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#041329">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -59,15 +59,31 @@ body.started #tools {display:flex}
 <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
 <link rel="stylesheet" href="planets.css">
 <style>body:not(.started) #planet-ui{display:none} body.started #planet-ui{top:155px;bottom:auto} @media(max-width:700px){body.started #planet-ui{top:auto;bottom:calc(130px + env(safe-area-inset-bottom))} body.started #planet-ui .planet-card{max-height:29vh}} #manual-camera{width:100%;border:1px solid #65d5e8;border-radius:12px;padding:15px;background:#123b58;color:white;font-weight:800;margin-top:9px;cursor:pointer}</style>
+<style>
+#start-overlay{background:radial-gradient(ellipse at 50% 10%,#19364a,#07101e 72%)}
+#start-card{padding:35px 28px;border:1px solid #7190a43b;border-radius:22px;background:rgba(9,22,37,.94);text-align:left;box-shadow:0 24px 70px #0008}
+#start-card h2{font-size:30px;letter-spacing:-.04em;line-height:1.12;margin:13px 0 9px;font-weight:650}
+#start-card p{color:#b7c9d5;font-size:13px;line-height:1.5}
+#start-card .eyebrow{font-size:10px;letter-spacing:.2em;color:#9ac5d8}
+#start-camera,#manual-camera{min-height:50px;text-align:left;border-radius:10px;font-size:14px;font-weight:700;padding:14px 16px}
+#start-camera{color:#102b3b;background:#d2edf5;margin-top:10px}
+#manual-camera{border:1px solid #526f81;background:#142d40;color:#f0f7fa}
+#start-error:empty{display:none}#start-card .ar-note{font-size:11px;color:#a7bdcb;margin-top:16px}
+#header{background:linear-gradient(180deg,rgba(4,13,25,.93),rgba(4,13,25,.5) 75%,transparent)}
+#status{background:rgba(9,22,37,.88);border-color:#69869a55}#status.found{color:#d4f4e8}#links a:first-child{background:#d2edf5;color:#102b3b}
+#links a,#links button,#tools button{border-color:#69869a88;background:#142d40;color:#eef8fb}#tools{background:rgba(9,22,37,.94);border-color:#69869a66}#tools .primary{background:#294b5e}
+button:focus-visible,a:focus-visible{outline:3px solid #b7e9ff;outline-offset:2px}
+</style>
 <script src="planets.js"></script>
+<script src="textures.js"></script>
 </head>
 <body>
 <div id="scene-mount"></div>
 <div id="hud"><div id="header">
-  <div class="eyebrow">SCIENCE EXPO · HIRO TRACKING · IOS + ANDROID</div>
-  <h1>Solar System — Touch & Place</h1>
-  <div id="status" role="status" aria-live="polite">Tap START CAMERA AR, then point at the full HIRO marker.</div>
-  <div id="links"><a href="print-marker.html" target="_blank" rel="noopener">Print HIRO</a><a href="index.html">3D / Android Table AR</a><button id="resume-camera" type="button">▶ Resume Camera</button><button id="restart" type="button">↻ Restart</button></div>
+  <div class="eyebrow">SCIENCE EXPO / CAMERA AR</div>
+  <h1>Explore in AR</h1>
+  <div id="status" role="status" aria-live="polite">Choose a camera mode to begin.</div>
+  <div id="links"><a href="print-marker.html" target="_blank" rel="noopener">Print HIRO</a><a href="index.html">3D Explorer</a><button id="resume-camera" type="button">Resume</button><button id="restart" type="button">Restart</button></div>
 </div></div>
 <div id="gesture-surface" aria-label="Touch here to move, pinch or rotate the Solar System"></div>
 <div id="gesture-tip">Tap a planet · drag to move · pinch / rotate</div>
@@ -76,12 +92,12 @@ body.started #tools {display:flex}
   <div class="tool-row"><button id="up">↑ Raise</button><button id="down">↓ Lower</button><button id="left">↶ Rotate</button><button id="right">Rotate ↷</button><button id="reset">Reset</button></div>
 </div>
 <div id="start-overlay" role="dialog" aria-label="Start camera AR"><div id="start-card">
-  <div style="font-size:43px">☀️</div><div class="eyebrow">IPHONE SAFARI + ANDROID CHROME</div>
-  <h2>Place Your Solar System</h2>
-  <p>Use Safari on iPhone or Chrome on Android. Scan a printed HIRO marker or choose manual placement. Manual placement is a screen overlay and will not stay fixed to a real table as you move.</p>
-  <button id="start-camera" type="button">SCAN HIRO MARKER</button><button id="manual-camera" type="button">PLACE WITHOUT HIRO</button><div id="start-error" role="alert"></div>
-  <p>On iPhone, open directly in <strong>Safari</strong>, allow <strong>Camera</strong> access, and keep the entire HIRO marker in view. Motion sensor permission is not needed. Works on HTTPS.</p>
-  <p><a href="print-marker.html">Print the marker</a> · <a href="index.html">3D preview</a></p>
+  <div class="eyebrow">SCIENCE EXPO / CAMERA AR</div>
+  <h2>Bring space into view</h2>
+  <p>Choose how to place the Solar System.</p>
+  <button id="start-camera" type="button">Scan HIRO marker</button><button id="manual-camera" type="button">Place without marker</button><div id="start-error" role="alert"></div>
+  <p class="ar-note">Manual placement stays on your screen, not on a real surface.</p>
+  <p><a href="print-marker.html">Print HIRO marker</a> · <a href="index.html">Back to 3D explorer</a></p>
 </div></div>
 <script>
 (function () {
@@ -131,7 +147,7 @@ body.started #tools {display:flex}
     $('size').textContent = Math.round(layout.scale*100)+'%';
     $('motion').textContent = orbitsRunning ? 'Ⅱ Pause' : '▶ Orbits';
     $('lock').textContent = adjustmentsLocked ? '🔒 Locked' : '🔓 Edit';
-    $('gesture-tip').textContent = adjustmentsLocked ? 'Layout locked · Tap Edit to adjust' : 'Tap a planet · drag to move · pinch / rotate';
+    $('gesture-tip').textContent = adjustmentsLocked ? 'Layout locked · Tap Edit to adjust' : 'Tap a planet · Drag or pinch to adjust';
   }
   function modify(fn) { if(adjustmentsLocked) return; fn(); applyLayout(); persist(); }
   $('smaller').onclick=()=>modify(()=>layout.scale=Math.max(.3,layout.scale/1.2));
@@ -268,7 +284,7 @@ body.started #tools {display:flex}
       if(video && video.paused) showResume(true);
     }
   });
-  function placeManual(x,y){ if(!anchor) return; anchor.object3D.position.set((x/innerWidth-.5)*3.5,(.5-y/innerHeight)*2.5,-3); anchor.object3D.rotation.set(-.85,0,0); anchor.object3D.visible=true; manualPlaced=true;manualAwaiting=false;everFound=true; document.body.classList.add('has-marker');setStatus('Manual screen overlay placed. Tap a planet for details; drag to move and pinch to resize. It is not fixed to the room.','found'); }
+  function placeManual(x,y){ if(!anchor) return; anchor.object3D.position.set((x/innerWidth-.5)*3.5,(.5-y/innerHeight)*2.5,-3); anchor.object3D.rotation.set(-.85,0,0); anchor.object3D.visible=true; manualPlaced=true;manualAwaiting=false;everFound=true; document.body.classList.add('has-marker');setStatus('Screen overlay placed · Tap a planet to explore.','found'); }
   function selectAt(x,y){if(!scene || !scene.camera || !anchor.object3D.visible)return;const T=AFRAME.THREE;const ray=new T.Raycaster();ray.setFromCamera(new T.Vector2(x/innerWidth*2-1,-y/innerHeight*2+1),scene.camera);const hit=ray.intersectObjects(selectable,false)[0];if(hit)panel.show(hit.object.userData.name);}
   function startCameraAR(chosenMode='hiro') {
     mode=chosenMode;
@@ -301,7 +317,7 @@ body.started #tools {display:flex}
       if(mode!=='hiro')return;
       markerVisible=true;everFound=true;
       document.body.classList.add('has-marker');
-      setStatus('✓ HIRO detected! Drag to move, pinch to resize, twist to rotate. Keep the marker visible for accurate alignment.','found');
+      setStatus('HIRO detected · Keep the marker in view.','found');
     });
     marker.addEventListener('markerLost',()=>{
       if(mode!=='hiro')return;
@@ -325,7 +341,7 @@ body.started #tools {display:flex}
   function initialize() {
     if(solarSystem || !marker || !anchor) return;
     const THREE=AFRAME.THREE;
-    if(mode==='manual'){scene.camera.add(anchor.object3D);anchor.object3D.visible=false;manualAwaiting=true;document.body.classList.add('has-marker');setStatus('Tap the camera view to place the screen overlay. It will not stay fixed to the room.','wait');}
+    if(mode==='manual'){scene.camera.add(anchor.object3D);anchor.object3D.visible=false;manualAwaiting=true;document.body.classList.add('has-marker');setStatus('Tap the camera view to place the overlay.','wait');}
     solarSystem=new THREE.Group();
     layoutRoot=new THREE.Group();
     anchor.object3D.add(layoutRoot);
@@ -335,50 +351,9 @@ body.started #tools {display:flex}
     const sphereGeometry = new THREE.SphereGeometry(1, 24, 16);
     orbiters = [];
 
-    // All planet textures are generated in the browser: no images or assets required.
-    // To reuse Unity planet images later, replace the materials' maps with TextureLoader images.
-    function planetTexture(colors, seed, stripes = false, earth = false) {
-      const c = document.createElement('canvas');
-      c.width = 256; c.height = 128;
-      const ctx = c.getContext('2d');
-      let s = seed >>> 0;
-      const rnd = () => { s = (Math.imul(1664525, s) + 1013904223) >>> 0; return s / 4294967296; };
-      const hex = (h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
-      const palette = colors.map(hex);
-      const img = ctx.createImageData(c.width, c.height);
-      for (let y = 0; y < c.height; y++) {
-        const lat = y / c.height;
-        for (let x = 0; x < c.width; x++) {
-          const i = (y * c.width + x) * 4;
-          const wave = Math.sin(y * (stripes ? .25 : .065) + Math.sin(x * .024) * (stripes ? 1.7 : 4.5));
-          const v = stripes ? Math.floor((wave + 1) / 2 * palette.length) : Math.floor(rnd() * palette.length);
-          const color = palette[Math.min(palette.length - 1, v)];
-          const shade = .84 + rnd() * .28;
-          img.data[i] = color[0] * shade;
-          img.data[i+1] = color[1] * shade;
-          img.data[i+2] = color[2] * shade;
-          img.data[i+3] = 255;
-        }
-      }
-      ctx.putImageData(img, 0, 0);
-      if (earth) {
-        ctx.fillStyle = '#4e9c6c';
-        for (let i = 0; i < 65; i++) {
-          const x = rnd() * 256, y = 12 + rnd() * 103;
-          const w = 6 + rnd() * 11, h = 2 + rnd() * 7;
-          ctx.beginPath(); ctx.ellipse(x, y, w, h, rnd() * Math.PI, 0, Math.PI * 2); ctx.fill();
-        }
-        ctx.fillStyle = 'rgba(245,250,255,.7)';
-        ctx.fillRect(0, 0, 256, 5); ctx.fillRect(0, 123, 256, 5);
-      }
-      const texture = new THREE.CanvasTexture(c);
-      texture.colorSpace = THREE.SRGBColorSpace;
-      return texture;
-    }
-
     function ball(radius, colors, seed, options = {}) {
-      const mat = new THREE.MeshStandardMaterial({
-        map: planetTexture(colors, seed, !!options.stripes, !!options.earth),
+      const mat = options.glow ? new THREE.MeshBasicMaterial({map:makeWorldTexture(THREE,'Sun')}) : new THREE.MeshStandardMaterial({
+        map: makeWorldTexture(THREE, options.name || (options.glow ? 'Sun' : 'Moon')),
         roughness: 1,
         metalness: 0,
         emissive: options.glow ? new THREE.Color(0xff7b12) : new THREE.Color(0x000000),
@@ -389,7 +364,7 @@ body.started #tools {display:flex}
       return m;
     }
 
-    sun = ball(.094, ['#ffb222', '#ffdc53', '#ff7d12', '#fff2a0'], 1, { glow: true });
+    sun = ball(.094, ['#ffb222', '#ffdc53', '#ff7d12', '#fff2a0'], 1, { glow: true, name: 'Sun' });
     sun.position.y = .12; sun.userData.name='Sun'; selectable.push(sun);
     solarSystem.add(sun);
     const glow = new THREE.Mesh(new THREE.SphereGeometry(.115, 24, 16),
@@ -449,7 +424,7 @@ body.started #tools {display:flex}
         const moonPivot = new THREE.Group();
         moonPivot.position.x = p.d;
         pivot.add(moonPivot);
-        const moon = ball(.006, ['#bbbdbf','#777e84','#dadcde'], 11);
+        const moon = ball(.006, ['#bbbdbf','#777e84','#dadcde'], 11, {name:'Moon'});
         moon.position.set(.042, .012, 0); moon.userData.name='Moon'; selectable.push(moon);
         moonPivot.add(moon);
         orbiters.push({ pivot: moonPivot, mesh: moon, speed: .36 });
