@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, ">
 <meta name="theme-color" content="#041329">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -57,6 +57,9 @@ body.started #tools {display:flex}
 </style>
 <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
 <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
+<link rel="stylesheet" href="planets.css">
+<style>body:not(.started) #planet-ui{display:none} body.started #planet-ui{top:155px;bottom:auto} @media(max-width:700px){body.started #planet-ui{top:auto;bottom:calc(130px + env(safe-area-inset-bottom))} body.started #planet-ui .planet-card{max-height:29vh}} #manual-camera{width:100%;border:1px solid #65d5e8;border-radius:12px;padding:15px;background:#123b58;color:white;font-weight:800;margin-top:9px;cursor:pointer}</style>
+<script src="planets.js"></script>
 </head>
 <body>
 <div id="scene-mount"></div>
@@ -67,7 +70,7 @@ body.started #tools {display:flex}
   <div id="links"><a href="print-marker.html" target="_blank" rel="noopener">Print HIRO</a><a href="index.html">3D / Android Table AR</a><button id="resume-camera" type="button">▶ Resume Camera</button><button id="restart" type="button">↻ Restart</button></div>
 </div></div>
 <div id="gesture-surface" aria-label="Touch here to move, pinch or rotate the Solar System"></div>
-<div id="gesture-tip">1 finger: move · 2 fingers: pinch / rotate</div>
+<div id="gesture-tip">Tap a planet · drag to move · pinch / rotate</div>
 <div id="tools" aria-label="Solar System touch controls">
   <div class="tool-row"><button id="smaller" aria-label="Make smaller">−</button><span id="size">100%</span><button id="bigger" aria-label="Make larger">+</button><button id="motion">▶ Orbits</button><button id="lock" class="primary">🔓 Edit</button></div>
   <div class="tool-row"><button id="up">↑ Raise</button><button id="down">↓ Lower</button><button id="left">↶ Rotate</button><button id="right">Rotate ↷</button><button id="reset">Reset</button></div>
@@ -75,8 +78,8 @@ body.started #tools {display:flex}
 <div id="start-overlay" role="dialog" aria-label="Start camera AR"><div id="start-card">
   <div style="font-size:43px">☀️</div><div class="eyebrow">IPHONE SAFARI + ANDROID CHROME</div>
   <h2>Place Your Solar System</h2>
-  <p>Use Safari on iPhone or Chrome on Android. Point at a printed HIRO marker: the Solar System appears automatically. Drag to move, pinch to resize, twist to rotate, then lock your adjustments.</p>
-  <button id="start-camera" type="button">START CAMERA AR</button><div id="start-error" role="alert"></div>
+  <p>Use Safari on iPhone or Chrome on Android. Scan a printed HIRO marker or choose manual placement. Manual placement is a screen overlay and will not stay fixed to a real table as you move.</p>
+  <button id="start-camera" type="button">SCAN HIRO MARKER</button><button id="manual-camera" type="button">PLACE WITHOUT HIRO</button><div id="start-error" role="alert"></div>
   <p>On iPhone, open directly in <strong>Safari</strong>, allow <strong>Camera</strong> access, and keep the entire HIRO marker in view. Motion sensor permission is not needed. Works on HTTPS.</p>
   <p><a href="print-marker.html">Print the marker</a> · <a href="index.html">3D preview</a></p>
 </div></div>
@@ -93,10 +96,12 @@ body.started #tools {display:flex}
   let lastSeenAt = -Infinity, lastTrackingMessage = '';
   let cameraReady = false, startingCamera = false;
   let orbitsRunning = false, adjustmentsLocked = false;
+  let mode="hiro", manualPlaced=false, manualAwaiting=false, touchStart=null, touchMoved=false;
+  const selectable=[]; const panel=makePlanetPanel();
   const HOLD_MS = 1300; // Visual grace period ONLY, not a real world anchor.
-  const STORE_KEY = 'solarExpoMarkerLayoutV3';
+  const STORE_KEY = 'solarExpoMarkerLayoutV4';
   const THREE_GESTURE_LIMIT = .15;
-  const defaultLayout = () => ({x:0,y:.06,z:0,scale:.72,yaw:0});
+  const defaultLayout = () => ({x:0,y:.06,z:0,scale:1.2,yaw:0});
   let layout = defaultLayout();
   try {
     const data = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
@@ -126,7 +131,7 @@ body.started #tools {display:flex}
     $('size').textContent = Math.round(layout.scale*100)+'%';
     $('motion').textContent = orbitsRunning ? 'Ⅱ Pause' : '▶ Orbits';
     $('lock').textContent = adjustmentsLocked ? '🔒 Locked' : '🔓 Edit';
-    $('gesture-tip').textContent = adjustmentsLocked ? 'Layout locked · Tap Edit to adjust' : '1 finger: move · 2 fingers: pinch / rotate';
+    $('gesture-tip').textContent = adjustmentsLocked ? 'Layout locked · Tap Edit to adjust' : 'Tap a planet · drag to move · pinch / rotate';
   }
   function modify(fn) { if(adjustmentsLocked) return; fn(); applyLayout(); persist(); }
   $('smaller').onclick=()=>modify(()=>layout.scale=Math.max(.3,layout.scale/1.2));
@@ -178,12 +183,13 @@ body.started #tools {display:flex}
     layout.z+=dy/innerHeight*.8;
   }
   gestureSurface.addEventListener('touchstart',e=>{
-    if(!everFound || adjustmentsLocked) return;
-    e.preventDefault(); gesture=touchInfo(e.touches);
+    if(!everFound && !manualAwaiting) return;
+    e.preventDefault(); const t=e.touches[0]; touchStart={x:t.clientX,y:t.clientY}; touchMoved=e.touches.length>1; gesture=touchInfo(e.touches);
   },{passive:false});
   gestureSurface.addEventListener('touchmove',e=>{
-    if(!gesture || adjustmentsLocked) return;
-    e.preventDefault();
+    if(!gesture) return;
+    e.preventDefault(); if(touchStart && e.touches[0] && Math.hypot(e.touches[0].clientX-touchStart.x,e.touches[0].clientY-touchStart.y)>8) touchMoved=true;
+    if(adjustmentsLocked || manualAwaiting) return;
     const next=touchInfo(e.touches);
     if(!next) return;
     if(next.n!==gesture.n){gesture=next;return;}
@@ -200,7 +206,7 @@ body.started #tools {display:flex}
     gesture=next;applyLayout();
   },{passive:false});
   gestureSurface.addEventListener('touchend',e=>{
-    if(gesture){persist();gesture=touchInfo(e.touches);}
+    if(!e.touches.length && touchStart && !touchMoved){if(manualAwaiting) placeManual(touchStart.x,touchStart.y); else selectAt(touchStart.x,touchStart.y);} if(gesture){persist();gesture=touchInfo(e.touches);} if(!e.touches.length)touchStart=null;
   },{passive:false});
   gestureSurface.addEventListener('touchcancel',()=>{gesture=null;persist();},{passive:false});
 
@@ -242,13 +248,13 @@ body.started #tools {display:flex}
     if(video && video.paused) {
       showResume(true);
       setStatus('Camera paused. Tap Resume Camera to continue, then scan HIRO.','wait');
-    } else if(!everFound) {
+    } else if(!everFound && mode==='hiro') {
       setStatus('Camera ready. Point at the FULL printed HIRO marker.','wait');
     }
   });
   window.addEventListener('camera-init',()=>{
     cameraReady=true;
-    if(!everFound) setStatus('Camera active. Searching for HIRO marker…','wait');
+    if(!everFound && mode==='hiro') setStatus('Camera active. Searching for HIRO marker…','wait');
   });
   window.addEventListener('camera-error',e=>{
     showResume(true);
@@ -262,7 +268,10 @@ body.started #tools {display:flex}
       if(video && video.paused) showResume(true);
     }
   });
-  function startCameraAR() {
+  function placeManual(x,y){ if(!anchor) return; anchor.object3D.position.set((x/innerWidth-.5)*3.5,(.5-y/innerHeight)*2.5,-3); anchor.object3D.rotation.set(-.85,0,0); anchor.object3D.visible=true; manualPlaced=true;manualAwaiting=false;everFound=true; document.body.classList.add('has-marker');setStatus('Manual screen overlay placed. Tap a planet for details; drag to move and pinch to resize. It is not fixed to the room.','found'); }
+  function selectAt(x,y){if(!scene || !scene.camera || !anchor.object3D.visible)return;const T=AFRAME.THREE;const ray=new T.Raycaster();ray.setFromCamera(new T.Vector2(x/innerWidth*2-1,-y/innerHeight*2+1),scene.camera);const hit=ray.intersectObjects(selectable,false)[0];if(hit)panel.show(hit.object.userData.name);}
+  function startCameraAR(chosenMode='hiro') {
+    mode=chosenMode;
     if(startingCamera) return;
     if(!window.isSecureContext) {
       $('start-error').textContent='Use your HTTPS GitHub Pages link, not a local file.';return;
@@ -289,11 +298,13 @@ body.started #tools {display:flex}
     </a-scene>`;
     scene=mount.querySelector('a-scene');marker=$('hiro-marker');anchor=$('stable-anchor');
     marker.addEventListener('markerFound',()=>{
+      if(mode!=='hiro')return;
       markerVisible=true;everFound=true;
       document.body.classList.add('has-marker');
       setStatus('✓ HIRO detected! Drag to move, pinch to resize, twist to rotate. Keep the marker visible for accurate alignment.','found');
     });
     marker.addEventListener('markerLost',()=>{
+      if(mode!=='hiro')return;
       markerVisible=false;
       document.body.classList.remove('has-marker');
       setStatus('Tracking briefly lost. Keep the full HIRO marker visible…','wait');
@@ -304,15 +315,17 @@ body.started #tools {display:flex}
       if(!video || video.readyState<2) {
         showResume(true);
         setStatus('Camera not displaying. Tap Resume Camera or Restart. On iPhone check Safari camera permission.','wait');
-      } else if(!everFound) {
+      } else if(!everFound && mode==='hiro') {
         setStatus('Camera is running. Hold the full black-bordered HIRO marker steady in view.','wait');
       }
     },12000);
   }
-  startButton.addEventListener('click',startCameraAR);
+  startButton.addEventListener('click',()=>startCameraAR('hiro'));
+  $('manual-camera').addEventListener('click',()=>startCameraAR('manual'));
   function initialize() {
     if(solarSystem || !marker || !anchor) return;
     const THREE=AFRAME.THREE;
+    if(mode==='manual'){scene.camera.add(anchor.object3D);anchor.object3D.visible=false;manualAwaiting=true;document.body.classList.add('has-marker');setStatus('Tap the camera view to place the screen overlay. It will not stay fixed to the room.','wait');}
     solarSystem=new THREE.Group();
     layoutRoot=new THREE.Group();
     anchor.object3D.add(layoutRoot);
@@ -377,7 +390,7 @@ body.started #tools {display:flex}
     }
 
     sun = ball(.094, ['#ffb222', '#ffdc53', '#ff7d12', '#fff2a0'], 1, { glow: true });
-    sun.position.y = .12;
+    sun.position.y = .12; sun.userData.name='Sun'; selectable.push(sun);
     solarSystem.add(sun);
     const glow = new THREE.Mesh(new THREE.SphereGeometry(.115, 24, 16),
       new THREE.MeshBasicMaterial({ color: 0xffa526, transparent: true, opacity: .09, depthWrite: false }));
@@ -411,7 +424,7 @@ body.started #tools {display:flex}
       const pivot = new THREE.Group();
       pivot.position.y = .12;
       pivot.rotation.y = i * 1.75;
-      const mesh = ball(p.r, p.colors, p.seed, p);
+      const mesh = ball(p.r, p.colors, p.seed, p); mesh.userData.name=p.name; selectable.push(mesh);
       mesh.position.x = p.d;
       pivot.add(mesh);
       solarSystem.add(pivot);
@@ -437,7 +450,7 @@ body.started #tools {display:flex}
         moonPivot.position.x = p.d;
         pivot.add(moonPivot);
         const moon = ball(.006, ['#bbbdbf','#777e84','#dadcde'], 11);
-        moon.position.set(.042, .012, 0);
+        moon.position.set(.042, .012, 0); moon.userData.name='Moon'; selectable.push(moon);
         moonPivot.add(moon);
         orbiters.push({ pivot: moonPivot, mesh: moon, speed: .36 });
       }
@@ -452,7 +465,7 @@ body.started #tools {display:flex}
       const dt=lastTime?Math.min((t-lastTime)/1000,.05):0;
       lastTime=t;
       // Tracking controls the anchor; planet orbiting NEVER changes its pose.
-      if(markerVisible && marker.object3D.visible) {
+      if(mode==='manual'){ anchor.object3D.visible=manualPlaced; } else if(markerVisible && marker.object3D.visible) {
         marker.object3D.updateMatrixWorld(true);
         marker.object3D.matrixWorld.decompose(targetPos,targetQuat,targetScale);
         const p=anchor.object3D;
